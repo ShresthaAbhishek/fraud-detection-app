@@ -1,0 +1,63 @@
+version: '1.2'
+
+services:
+  # 1. Redis (State Management for Rule Engine)
+  redis:
+    image: redis:7.0-alpine
+    container_name: redis
+    command: redis-server --requirepass caremember
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "caremember", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  
+  # 2. ML Model Service (Python/FastAPI)
+  ml-model-service:
+    build:
+      context: ./ml-model-service
+    container_name: ml-model-service
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+
+  # 3. Rule Engine Service (Node.js)
+  rule-engine-service:
+    build:
+      context: ./rule-engine-service
+    container_name: rule-engine-service
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - REDIS_URL=redis://:caremember@redis:6379 # Connects to the Redis container name
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+
+  # 4. Aggregator Service (Public-facing, Node.js)
+  aggregator-service:
+    build:
+      context: ./aggregator-service
+    container_name: aggregator-service
+    ports:
+      - "3000:3000" # Expose the main API endpoint
+    environment:
+      - PORT=3000
+      - RULE_ENGINE_URL=http://rule-engine-service:3001
+      - ML_MODEL_URL=http://ml-model-service:8000
+      - API_KEY=9898 # Security variable
+    depends_on:
+      ml-model-service:
+        condition: service_started
+      rule-engine-service:
+        condition: service_started
+    restart: always

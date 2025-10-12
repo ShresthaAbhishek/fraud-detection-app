@@ -1,0 +1,16 @@
+{
+    "name": "aggregator-service",
+    "version": "1.0.0",
+    "description": "Orchestrates fraud analysis services and applies hybrid logic.",
+    "main": "index.js",
+    "scripts": {
+      "start": "node index.js"
+    },
+    "dependencies": {
+      "express": "^4.18.2",
+      "cors": "^2.8.5",
+      "axios": "^1.6.8",
+      "winston": "^3.11.0",
+      "dotenv": "^16.4.5"
+    }
+  }

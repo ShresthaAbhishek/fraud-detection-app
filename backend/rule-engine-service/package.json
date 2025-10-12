@@ -1,0 +1,14 @@
+{
+    "name": "rule-engine-service",
+    "version": "1.0.0",
+    "description": "Applies rule-based fraud detection checks with Redis state.",
+    "main": "index.js",
+    "scripts": {
+      "start": "node index.js"
+    },
+    "dependencies": {
+      "express": "^4.18.2",
+      "redis": "^4.6.13",
+      "dotenv": "^16.4.5"
+    }
+  }
