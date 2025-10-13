@@ -62,11 +62,28 @@ const authMiddleware = (req, res, next) => {
 };
 
 
-// --- Hybrid Decision Logic ---
-function computeHybridScore(isRuleFraud, mlProbability) {
-  const weightRule = 0.4;
-  const weightML = 0.6;
-  return weightRule * (isRuleFraud ? 1 : 0) + weightML * mlProbability;
+// --- Enhanced Hybrid Decision Logic with Nuanced Scoring ---
+function computeHybridScore(isRuleFraud, mlProbability, ruleFraudScore = 0) {
+  // Convert rule fraud score (0-100) to probability (0-1)
+  const ruleProbability = Math.min(ruleFraudScore / 100, 1.0);
+  
+  // Weighted combination of ML and Rule probabilities
+  const weightML = 0.7;  // ML gets more weight for nuanced scoring
+  const weightRule = 0.3; // Rule engine provides additional context
+  
+  // Base hybrid score from weighted combination
+  let hybridScore = weightML * mlProbability + weightRule * ruleProbability;
+  
+  // Simplified scoring - no boosts, just weighted combination
+  
+  // Ensure score stays within bounds
+  hybridScore = Math.max(0.0, Math.min(1.0, hybridScore));
+  
+  // Add small random variation for nuanced scoring
+  const randomVariation = (Math.random() - 0.5) * 0.02;
+  hybridScore = Math.max(0.0, Math.min(1.0, hybridScore + randomVariation));
+  
+  return hybridScore;
 }
 
 // --- Main API Endpoint with Validation, Timeout, and Retry/Fallback ---
@@ -97,9 +114,14 @@ app.post("/api/v1/verdict", authMiddleware, (req, res, next) => {
     // Process Rule Verdict (Fallback: Default to Not Fraud if service fails or times out)
     let ruleVerdict = false;
     let ruleReason = null;
+    let fraudScore = 0;
+    let riskLevel = "LOW";
+    
     if (ruleResponse.status === 'fulfilled' && ruleResponse.value.data.is_fraud_rule !== undefined) {
       ruleVerdict = ruleResponse.value.data.is_fraud_rule;
       ruleReason = ruleResponse.value.data.reason;
+      fraudScore = ruleResponse.value.data.fraud_score || 0;
+      riskLevel = ruleResponse.value.data.risk_level || "LOW";
     } else {
         logger.error(`[${correlationId}] Rule Engine failed. Defaulting to Not Fraud.`);
     }
@@ -112,8 +134,8 @@ app.post("/api/v1/verdict", authMiddleware, (req, res, next) => {
         logger.error(`[${correlationId}] ML Model failed. Defaulting to 0 probability.`);
     }
 
-    // Compute Hybrid Score
-    const hybridScore = computeHybridScore(ruleVerdict, mlProbability);
+    // Compute Hybrid Score with rule fraud score
+    const hybridScore = computeHybridScore(ruleVerdict, mlProbability, fraudScore);
     const finalVerdict = hybridScore > 0.5 ? "Fraud" : "Not Fraud";
     
     res.status(200).json({
@@ -121,7 +143,10 @@ app.post("/api/v1/verdict", authMiddleware, (req, res, next) => {
       rule_verdict: ruleVerdict,
       ml_probability: mlProbability,
       hybrid_score: hybridScore,
-      reason: ruleVerdict ? ruleReason : (finalVerdict === 'Fraud' ? "High ML Probability" : null)
+      fraud_score: fraudScore,
+      risk_level: riskLevel,
+      reason: ruleVerdict ? ruleReason : (finalVerdict === 'Fraud' ? "High ML Probability" : null),
+      confidence: Math.abs(hybridScore - 0.5) * 2 // Confidence level based on distance from threshold
     });
 
   } catch (error) {

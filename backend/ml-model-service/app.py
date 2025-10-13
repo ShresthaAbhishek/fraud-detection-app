@@ -53,44 +53,116 @@ def predict(transaction: Transaction):
         }])
 
         if model is None:
-             # Enhanced Fallback: More dynamic mock prediction if model failed to load
+             # Enhanced Fallback: More nuanced mock prediction with continuous scoring
             y_prob = 0.05  # Base probability
             
-            # Amount-based risk
-            if transaction.amount > 10000:
-                y_prob += 0.3
+            # Amount-based risk (more granular and progressive)
+            if transaction.amount > 100000:
+                y_prob += 0.35
+            elif transaction.amount > 50000:
+                y_prob += 0.25
+            elif transaction.amount > 25000:
+                y_prob += 0.18
+            elif transaction.amount > 10000:
+                y_prob += 0.12
             elif transaction.amount > 5000:
-                y_prob += 0.2
+                y_prob += 0.08
             elif transaction.amount > 1000:
-                y_prob += 0.1
+                y_prob += 0.03
+            elif transaction.amount > 100:
+                y_prob += 0.01
             
-            # Transaction type risk
+            # Transaction type risk (more nuanced)
             if transaction.type == "CASH_OUT":
-                y_prob += 0.2
+                y_prob += 0.12
             elif transaction.type == "TRANSFER":
-                y_prob += 0.15
+                y_prob += 0.08
             elif transaction.type == "DEBIT":
-                y_prob += 0.1
+                y_prob += 0.05
+            elif transaction.type == "PAYMENT":
+                y_prob -= 0.02  # Payments are generally safer
+            elif transaction.type == "CASH_IN":
+                y_prob -= 0.01  # Cash in is generally safe
             
-            # Balance difference risk
+            # Balance difference risk (more sophisticated)
             balance_diff = abs(transaction.oldbalanceOrg - transaction.newbalanceOrig)
-            if balance_diff > transaction.amount:
-                y_prob += 0.2
+            if balance_diff > transaction.amount * 1.2:  # More than 20% difference
+                y_prob += 0.15
+            elif balance_diff > transaction.amount * 1.1:  # More than 10% difference
+                y_prob += 0.08
+            elif balance_diff > transaction.amount * 1.05:  # More than 5% difference
+                y_prob += 0.03
+            
+            # Account balance ratio risk (more granular)
+            if transaction.oldbalanceOrg > 0:
+                amount_ratio = transaction.amount / transaction.oldbalanceOrg
+                if amount_ratio > 0.95:  # Transaction is >95% of account balance
+                    y_prob += 0.25
+                elif amount_ratio > 0.8:  # Transaction is >80% of account balance
+                    y_prob += 0.15
+                elif amount_ratio > 0.5:  # Transaction is >50% of account balance
+                    y_prob += 0.08
+                elif amount_ratio > 0.2:  # Transaction is >20% of account balance
+                    y_prob += 0.03
+            
+            # Destination account analysis
+            if transaction.newbalanceDest > 0:
+                dest_ratio = transaction.amount / transaction.newbalanceDest
+                if dest_ratio > 0.5:  # Large amount relative to destination balance
+                    y_prob += 0.05
+            
+            # Add some randomness for variety (small variation)
+            import random
+            random_factor = random.uniform(0.95, 1.05)
+            y_prob *= random_factor
             
             # Cap probability between 0 and 1
             y_prob = min(max(y_prob, 0.0), 1.0)
             y_pred = y_prob > 0.5
         else:
-            # Actual Prediction with enhanced sensitivity
+            # Actual Prediction with enhanced sensitivity and continuous scoring
             y_pred = model.predict(X)[0]
             y_prob = model.predict_proba(X)[0, 1] if hasattr(model, "predict_proba") else float(y_pred)
             
-            # Enhance the model's sensitivity by applying a scaling factor
-            # This makes the model more responsive to fraud patterns
-            if y_prob < 0.1:
-                y_prob = y_prob * 2  # Double low probabilities
-            elif y_prob < 0.3:
-                y_prob = y_prob * 1.5  # Increase medium probabilities
+            # Apply nuanced transaction-specific adjustments
+            if transaction.type == "TRANSFER":
+                # Moderate TRANSFER adjustments - don't make it binary
+                if y_prob > 0.8:
+                    y_prob = 0.8 + (y_prob - 0.8) * 0.3  # Gentle reduction for very high probabilities
+                elif y_prob > 0.6:
+                    y_prob = 0.6 + (y_prob - 0.6) * 0.7  # Moderate reduction for high probabilities
+            elif transaction.type == "PAYMENT":
+                # PAYMENT transactions are generally safer - gradual reduction
+                y_prob = y_prob * 0.4  # Moderate reduction for payments
+            elif transaction.type == "CASH_IN":
+                # CASH_IN is generally safe
+                y_prob = y_prob * 0.2  # Significant reduction for cash in
+            elif transaction.type == "CASH_OUT":
+                # CASH_OUT has higher risk - moderate increase
+                y_prob = min(y_prob * 1.2, 1.0)
+            
+            # Apply progressive amount-based adjustments
+            if transaction.amount > 100000:
+                y_prob = min(y_prob + 0.15, 1.0)  # Moderate increase for very large amounts
+            elif transaction.amount > 50000:
+                y_prob = min(y_prob + 0.1, 1.0)   # Small increase for large amounts
+            elif transaction.amount > 25000:
+                y_prob = min(y_prob + 0.05, 1.0)  # Very small increase for medium amounts
+            elif transaction.amount < 100:
+                y_prob = max(y_prob - 0.05, 0.0)  # Small decrease for very small amounts
+            
+            # Apply balance-based adjustments for more nuanced scoring
+            if transaction.oldbalanceOrg > 0:
+                amount_ratio = transaction.amount / transaction.oldbalanceOrg
+                if amount_ratio > 0.9:
+                    y_prob = min(y_prob + 0.1, 1.0)  # Increase risk for high ratio
+                elif amount_ratio > 0.5:
+                    y_prob = min(y_prob + 0.05, 1.0)  # Small increase for medium ratio
+            
+            # Add small random variation for continuous scoring
+            import random
+            random_factor = random.uniform(0.98, 1.02)
+            y_prob *= random_factor
             
             # Ensure probability stays within bounds
             y_prob = min(max(y_prob, 0.0), 1.0)
