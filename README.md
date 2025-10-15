@@ -1,4 +1,7 @@
 # Fraud Detection System with Hybrid Scoring Model
+<div align="center">
+  <img src="./images/3.png" alt="Hybrid Fraud Detection Banner" width="90%">
+</div>
 
 A sophisticated real-time fraud detection system that combines machine learning algorithms with rule-based engines to provide nuanced, continuous risk scoring for financial transactions.
 
@@ -404,8 +407,6 @@ Here are some examples demonstrating the hybrid scoring in action:
 
 ### API Response Examples
 
-#### Low Risk Transaction (PAYMENT)
-
 #### Medium Risk Transaction (CASH_OUT)
 
 ```json
@@ -447,6 +448,11 @@ Here are some examples demonstrating the hybrid scoring in action:
 | TRANSFER | 0.68 | 45 | 0.611 | HIGH |
 
 ### Frontend Output Examples
+##### Example 1: Legitimate Transaction            
+<img src="./images/1.png" alt="High-Risk Transaction Blocked" width="600"/>
+
+##### Example 2: Risky Transaction (Rule Override Triggered)           
+<img src="./images/2.png" alt="High-Risk Transaction Blocked" width="600"/>
 
 
 ### Performance Metrics
